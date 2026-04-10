@@ -1,15 +1,16 @@
 # Apolo Drive - File Server
 
-Repositorio web con gestión de archivos, carpetas y usuarios. Desplegable en **Vercel** (frontend) + **Render** (backend) + **Supabase** (base de datos y storage).
+Repositorio web con gestión de archivos, carpetas y usuarios. Desplegable en **Vercel** (frontend + backend serverless) + **Supabase** (base de datos y storage).
 
 ## Stack
 
 | Capa | Tecnología |
 |------|-----------|
 | Frontend | React + Vite + TypeScript + Tailwind CSS |
-| Backend | FastAPI + Python |
+| Backend | FastAPI + Python (Vercel Serverless Functions) |
 | Base de datos | Supabase (PostgreSQL + Storage) |
 | Autenticación | Supabase Auth + JWT |
+| Hosting | Vercel (todo en uno) |
 
 ## Funcionalidades
 
@@ -41,13 +42,12 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-cp .env.example .env      # Ajustar si es necesario
 npm run dev
 ```
 
-Abre http://localhost:5173
+Abre http://localhost:5173 (el proxy de Vite redirige `/api` al backend en puerto 8000)
 
-## Puesta en producción
+## Puesta en producción (solo Vercel + Supabase)
 
 ### Paso 1: Supabase
 
@@ -61,53 +61,37 @@ Abre http://localhost:5173
 
 ### Paso 2: Crear usuario admin inicial
 
-En el **SQL Editor** de Supabase, después de registrar tu primer usuario vía la API o dashboard de Supabase Auth:
+En **Supabase Dashboard > Authentication > Users**, crea tu primer usuario. Luego en **SQL Editor**:
 
 ```sql
 UPDATE public.profiles SET role = 'admin' WHERE email = 'tu-email@ejemplo.com';
 ```
 
-O usa el dashboard de Supabase Auth para crear el usuario, y luego actualiza su rol.
+### Paso 3: Vercel
 
-### Paso 3: Render (Backend)
-
-1. Conecta tu repo en [render.com](https://render.com)
-2. Crea un **Web Service**:
-   - **Root directory**: `backend`
-   - **Build command**: `pip install -r requirements.txt`
-   - **Start command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. Agrega las **Environment Variables**:
+1. Conecta tu repo en [vercel.com](https://vercel.com)
+2. No cambies el root directory (dejar la raíz `/`)
+3. Vercel detectará automáticamente el `vercel.json` que:
+   - Construye el frontend con `cd frontend && npm install && npm run build`
+   - Sirve el frontend desde `frontend/dist`
+   - Ejecuta el backend FastAPI como serverless function en `/api`
+4. Agrega las **Environment Variables** en Vercel:
    - `SUPABASE_URL`
    - `SUPABASE_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `SUPABASE_JWT_SECRET`
-   - `FRONTEND_URL` = tu URL de Vercel (paso 4)
+   - `FRONTEND_URL` = tu URL de Vercel (ej: `https://apolo-drive.vercel.app`)
 
-### Paso 4: Vercel (Frontend)
+### Paso 4: Dominio personalizado (opcional)
 
-1. Conecta tu repo en [vercel.com](https://vercel.com)
-2. Configura:
-   - **Root directory**: `frontend`
-   - **Build command**: `npm run build`
-   - **Output directory**: `dist`
-3. Agrega **Environment Variable**:
-   - `VITE_API_URL` = tu URL de Render (ej: `https://apolo-drive-api.onrender.com`)
-4. Edita `frontend/vercel.json` y reemplaza `tu-backend.onrender.com` con tu URL real
-
-### Paso 5: CORS
-
-En Render, actualiza la variable `FRONTEND_URL` con tu URL de Vercel.
-
-### Paso 6: Keep-alive (opcional)
-
-Render free tier duerme tras 15 min de inactividad. Configura un cron en [cron-job.org](https://cron-job.org):
-- URL: `https://tu-backend.onrender.com/api/health`
-- Intervalo: cada 10 minutos
+En Vercel > Settings > Domains, agrega tu dominio `drive.apolonext.com` y configura el DNS.
 
 ## Estructura del proyecto
 
 ```
 apolo-drive/
+├── api/
+│   └── index.py           # Entry point: importa FastAPI para Vercel Serverless
 ├── frontend/              # React + Vite + TypeScript
 │   ├── src/
 │   │   ├── components/    # Layout, Sidebar
@@ -124,6 +108,8 @@ apolo-drive/
 │   │   ├── models.py      # Pydantic models
 │   │   └── routes/        # auth, users, folders, files
 │   └── ...
-└── supabase/
-    └── schema.sql         # Tablas, RLS, triggers, storage bucket
+├── supabase/
+│   └── schema.sql         # Tablas, RLS, triggers, storage bucket
+├── vercel.json            # Config de build + routing
+└── requirements.txt       # Dependencias Python (Vercel las instala automáticamente)
 ```
